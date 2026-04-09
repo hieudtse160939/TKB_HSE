@@ -1,0 +1,185 @@
+import pandas as pd
+import openpyxl
+import streamlit as st
+import io
+
+# =====================================================================
+# 1. BỘ TỪ ĐIỂN TỰ ĐỘNG CỦA TRƯỜNG HOA SEN
+# =====================================================================
+TU_DIEN = {
+    ("Vân", "L"): "Cô Vân (Lý)",
+    ("Vân", "CĐ Lý"): "Cô Vân (Lý)",
+    ("Vân", "Đ"): "Cô Vân (Địa)",
+    ("Vân", "A"): "Cô Thảo Vân (Anh)",
+    ("Vân", "IELTS/A"): "Cô Thảo Vân (Anh)",
+    ("Vân", "TNHN"): "Cô Vân (Lý)",
+    ("Nhung", "V"): "Cô T.Nhung (Văn)",
+    ("Nhung", "CĐ Văn"): "Cô T.Nhung (Văn)",
+    ("Nhung", "A"): "Cô Nhung (Anh)",
+    ("Nhung", "AVTH"): "Cô Nhung (Anh)",
+    ("Nhung", "TNHN"): "Cô Nhung (TNHN)",
+    ("Tâm", "V"): "Thầy Tâm (Văn)",
+    ("Tâm", "CĐ Văn"): "Thầy Tâm (Văn)",
+    ("Tâm", "AVTH"): "Cô Tâm (Anh)",
+    ("Ngọc", "L"): "Cô Ngọc (Lý)",
+    ("Ngọc", "CĐ Lý"): "Cô Ngọc (Lý)",
+    ("Ngọc", "KTPL"): "Thầy Ngọc (KTPL)",
+    ("Ngọc", "CĐ KTPL"): "Thầy Ngọc (KTPL)",
+    ("Ngọc", "CN"): "Cô Ngọc (Công Nghệ)",
+    ("Phương", "V"): "Cô Phương (Văn)",
+    ("Phương", "Su"): "Cô Phương (Sử)",
+    ("Phương", "CĐ Sử"): "Cô Phương (Sử)",
+    ("Anh", "KTPL"): "Cô Lan Anh (GDCD/KTPL)",
+    ("Anh", "CĐ KTPL"): "Cô Lan Anh (GDCD/KTPL)",
+    ("Anh", "GDCD"): "Cô Lan Anh (GDCD/KTPL)",
+    ("Nghĩa", "T"): "Thầy Nghĩa (Toán)",
+    ("Nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
+    ("nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
+    ("Bình", "V"): "Thầy/Cô Bình (Văn)",
+    ("Bình", "CĐ Văn"): "Thầy/Cô Bình (Văn)",
+    ("Bảo", "Su"): "Thầy Bảo (Sử/GDĐP)",
+    ("Bảo", "SĐ"): "Thầy Bảo (Sử/GDĐP)",
+    ("Chi", "H"): "Cô Chi (Hóa)",
+    ("Chi", "TNHN"): "Cô Chi (Hóa)",
+    ("Diệp", "V"): "Cô Diệp (Văn)",
+    ("Diệp", "CĐ Văn"): "Cô Diệp (Văn)",
+    ("Diệp", "Su"): "Cô Diệp (Sử)",
+    ("Diệp", "GDĐP"): "Cô Diệp (Sử)",
+    ("Xuân", "GDCD"): "Cô Xuân (GDCD/KTPL)",
+    ("Xuân", "KTPL"): "Cô Xuân (GDCD/KTPL)",
+    ("Xuân", "CĐ KTPL"): "Cô Xuân (GDCD/KTPL)",
+    ("Vinh", "GDCD"): "Cô Vinh (GDCD/KTPL)",
+    ("Vinh", "KTPL"): "Cô Vinh (GDCD/KTPL)",
+    ("Vinh", "CĐ KTPL"): "Cô Vinh (GDCD/KTPL)",
+}
+
+def get_standard_name(ten_ky_hieu, mon_hoc):
+    if mon_hoc == 'Chủ nhiệm':
+        return f"{ten_ky_hieu} (GVCN)"
+    if (ten_ky_hieu, mon_hoc) in TU_DIEN:
+        return TU_DIEN[(ten_ky_hieu, mon_hoc)]
+    return ten_ky_hieu
+
+# =====================================================================
+# 2. HÀM XỬ LÝ CHÍNH TRÊN MEMORY
+# =====================================================================
+def process_tkb_data(uploaded_file):
+    # Đọc file upload vào openpyxl
+    wb = openpyxl.load_workbook(uploaded_file)
+    
+    # 2.1. Unmerge và xử lý dữ liệu thô
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        merged_ranges = list(ws.merged_cells.ranges)
+        
+        for merged_range in merged_ranges:
+            min_col, min_row, max_col, max_row = merged_range.bounds
+            top_left_cell_value = ws.cell(row=min_row, column=min_col).value
+            ws.unmerge_cells(str(merged_range))
+            for row in range(min_row, max_row + 1):
+                for col in range(min_col, max_col + 1):
+                    ws.cell(row=row, column=col).value = top_left_cell_value
+                    
+        max_row_current = ws.max_row
+        if max_row_current > 66:
+            ws.delete_rows(67, max_row_current - 66)
+            
+    # 2.2. Lưu workbook vào bộ nhớ tạm (BytesIO) thay vì ổ cứng
+    virtual_workbook = io.BytesIO()
+    wb.save(virtual_workbook)
+    virtual_workbook.seek(0) # Đưa con trỏ về đầu file để pandas đọc
+    
+    # 2.3. Dùng Pandas đọc từ file ảo
+    df = pd.read_excel(virtual_workbook) 
+    
+    class_row_idx = 3
+    gvcn_row_idx = 4
+    classes = {} 
+    gvcn = {}    
+    
+    class_row = df.iloc[class_row_idx]
+    gvcn_row = df.iloc[gvcn_row_idx]
+    
+    for col_idx, val in enumerate(class_row):
+        if pd.notna(val) and isinstance(val, str) and ('DA' in val): 
+            class_name = val.strip()
+            classes[col_idx] = class_name
+            gv_val = str(gvcn_row.iloc[col_idx]).strip()
+            if '-' in gv_val:
+                gvcn[class_name] = gv_val.split('-')[0].strip()
+            else:
+                gvcn[class_name] = gv_val
+
+    records = []
+    for row_idx in range(5, len(df)):
+        row = df.iloc[row_idx]
+        for col_idx, class_name in classes.items():
+            cell_val = str(row.iloc[col_idx]).strip()
+            if cell_val == 'nan' or cell_val == '' or cell_val in ['CHÀO CỜ', 'SINH HOẠT ĐẦU GIỜ', 'THỂ DỤC THỂ THAO']:
+                continue
+
+            if cell_val.lower() == 'chủ nhiệm':
+                ten_goc = gvcn.get(class_name, 'Unknown')
+                records.append({
+                    'Giáo viên': get_standard_name(ten_goc, 'Chủ nhiệm'),
+                    'Lớp': class_name, 
+                    'Môn': 'Chủ nhiệm'
+                })
+            elif '-' in cell_val:
+                parts = cell_val.split('-')
+                if len(parts) >= 2:
+                    mon_hoc = "-".join(parts[:-1]).strip() 
+                    ten_goc = parts[-1].strip()        
+                    records.append({
+                        'Giáo viên': get_standard_name(ten_goc, mon_hoc),
+                        'Lớp': class_name, 
+                        'Môn': mon_hoc
+                    })
+            else:
+                records.append({
+                    'Giáo viên': 'Chung (Không ghi tên)',
+                    'Lớp': class_name, 
+                    'Môn': cell_val
+                })
+
+    df_records = pd.DataFrame(records)
+    if df_records.empty:
+        return None
+        
+    df_summary = df_records.groupby(['Giáo viên', 'Lớp', 'Môn']).size().reset_index(name='Số tiết')
+    df_summary = df_summary.sort_values(by=['Giáo viên', 'Lớp', 'Môn'])
+    
+    return df_summary
+
+# =====================================================================
+# 3. GIAO DIỆN STREAMLIT
+# =====================================================================
+st.set_page_config(page_title="Thống kê TKB", layout="wide")
+
+st.title("📊 Công cụ Xử lý & Thống kê TKB")
+
+# Khu vực upload file
+uploaded_file = st.file_uploader("Kéo thả hoặc chọn file TKB (.xlsx) vào đây", type=["xlsx"])
+
+if uploaded_file is not None:
+    # Nút bấm bắt đầu xử lý
+    if st.button("Bắt đầu phân tích dữ liệu", type="primary"):
+        with st.spinner('Đang xử lý dữ liệu...'):
+            df_ket_qua = process_tkb_data(uploaded_file)
+            
+            if df_ket_qua is not None:
+                st.success("Đã xử lý xong!")
+                
+                # Hiển thị bảng dữ liệu trên app
+                st.dataframe(df_ket_qua, use_container_width=True)
+                
+                # Nút download CSV
+                csv = df_ket_qua.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(
+                    label="📥 Tải file CSV",
+                    data=csv,
+                    file_name="ThongKe_TKB.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel. Vui lòng kiểm tra lại cấu trúc file.")
