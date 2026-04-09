@@ -64,10 +64,8 @@ def get_standard_name(ten_ky_hieu, mon_hoc):
 # 2. HÀM XỬ LÝ CHÍNH TRÊN MEMORY
 # =====================================================================
 def process_tkb_data(uploaded_file):
-    # Đọc file upload vào openpyxl
     wb = openpyxl.load_workbook(uploaded_file)
     
-    # 2.1. Unmerge và xử lý dữ liệu thô
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         merged_ranges = list(ws.merged_cells.ranges)
@@ -84,12 +82,10 @@ def process_tkb_data(uploaded_file):
         if max_row_current > 66:
             ws.delete_rows(67, max_row_current - 66)
             
-    # 2.2. Lưu workbook vào bộ nhớ tạm (BytesIO) thay vì ổ cứng
     virtual_workbook = io.BytesIO()
     wb.save(virtual_workbook)
-    virtual_workbook.seek(0) # Đưa con trỏ về đầu file để pandas đọc
+    virtual_workbook.seek(0)
     
-    # 2.3. Dùng Pandas đọc từ file ảo
     df = pd.read_excel(virtual_workbook) 
     
     class_row_idx = 3
@@ -152,34 +148,71 @@ def process_tkb_data(uploaded_file):
     return df_summary
 
 # =====================================================================
-# 3. GIAO DIỆN STREAMLIT
+# 3. GIAO DIỆN STREAMLIT VỚI FILTER VÀ EXPORT
 # =====================================================================
-st.set_page_config(page_title="Thống kê TKB", layout="wide")
+st.set_page_config(page_title="Thống kê TKB", page_icon="📊", layout="wide")
 
 st.title("📊 Công cụ Xử lý & Thống kê TKB")
 
-# Khu vực upload file
+# --- KHỞI TẠO SESSION STATE ---
+# Giúp giữ lại dữ liệu kể cả khi người dùng thay đổi bộ lọc
+if 'df_data' not in st.session_state:
+    st.session_state.df_data = None
+
+# --- KHU VỰC UPLOAD ---
 uploaded_file = st.file_uploader("Kéo thả hoặc chọn file TKB (.xlsx) vào đây", type=["xlsx"])
 
 if uploaded_file is not None:
-    # Nút bấm bắt đầu xử lý
     if st.button("Bắt đầu phân tích dữ liệu", type="primary"):
         with st.spinner('Đang xử lý dữ liệu...'):
             df_ket_qua = process_tkb_data(uploaded_file)
             
             if df_ket_qua is not None:
-                st.success("Đã xử lý xong!")
-                
-                # Hiển thị bảng dữ liệu trên app
-                st.dataframe(df_ket_qua, use_container_width=True)
-                
-                # Nút download CSV
-                csv = df_ket_qua.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-                st.download_button(
-                    label="📥 Tải file CSV",
-                    data=csv,
-                    file_name="ThongKe_TKB.csv",
-                    mime="text/csv",
-                )
+                # Lưu vào session state
+                st.session_state.df_data = df_ket_qua
+                st.success("Đã phân tích xong! Bạn có thể dùng bộ lọc bên dưới.")
             else:
-                st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel. Vui lòng kiểm tra lại cấu trúc file.")
+                st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel.")
+
+# --- KHU VỰC BỘ LỌC & HIỂN THỊ (Chỉ hiện khi đã có dữ liệu) ---
+if st.session_state.df_data is not None:
+    df = st.session_state.df_data
+    
+    st.divider()
+    st.subheader("🔍 Bộ lọc dữ liệu")
+    
+    # Chia làm 2 cột cho đẹp
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Lấy danh sách duy nhất và sắp xếp
+        danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
+        # multiselect cho phép chọn nhiều giáo viên cùng lúc. Nếu để trống = hiển thị tất cả.
+        gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên (Để trống để xem tất cả):", danh_sach_gv)
+        
+    with col2:
+        danh_sach_lop = sorted(df['Lớp'].unique().tolist())
+        lop_chon = st.multiselect("🏫 Chọn Lớp (Để trống để xem tất cả):", danh_sach_lop)
+
+    # --- ÁP DỤNG BỘ LỌC ---
+    df_filtered = df.copy()
+    
+    if len(gv_chon) > 0:
+        df_filtered = df_filtered[df_filtered['Giáo viên'].isin(gv_chon)]
+        
+    if len(lop_chon) > 0:
+        df_filtered = df_filtered[df_filtered['Lớp'].isin(lop_chon)]
+
+    # --- HIỂN THỊ KẾT QUẢ ĐÃ LỌC ---
+    st.markdown(f"**Hiển thị {len(df_filtered)} kết quả:**")
+    st.dataframe(df_filtered, use_container_width=True)
+    
+    # --- XUẤT FILE DỮ LIỆU ĐÃ LỌC ---
+    # Nút này giờ đây sẽ tải xuống df_filtered thay vì df gốc
+    csv = df_filtered.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+    st.download_button(
+        label="📥 Tải file kết quả (Excel/CSV)",
+        data=csv,
+        file_name="ThongKe_TKB_DaLoc.csv",
+        mime="text/csv",
+    )
