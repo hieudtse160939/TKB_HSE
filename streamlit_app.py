@@ -13,41 +13,53 @@ TU_DIEN = {
     ("Vân", "A"): "Cô Thảo Vân (Anh)",
     ("Vân", "IELTS/A"): "Cô Thảo Vân (Anh)",
     ("Vân", "TNHN"): "Cô Vân (Lý)",
+    
     ("Nhung", "V"): "Cô T.Nhung (Văn)",
     ("Nhung", "CĐ Văn"): "Cô T.Nhung (Văn)",
     ("Nhung", "A"): "Cô Nhung (Anh)",
     ("Nhung", "AVTH"): "Cô Nhung (Anh)",
     ("Nhung", "TNHN"): "Cô Nhung (TNHN)",
+    
     ("Tâm", "V"): "Thầy Tâm (Văn)",
     ("Tâm", "CĐ Văn"): "Thầy Tâm (Văn)",
     ("Tâm", "AVTH"): "Cô Tâm (Anh)",
+    
     ("Ngọc", "L"): "Cô Ngọc (Lý)",
     ("Ngọc", "CĐ Lý"): "Cô Ngọc (Lý)",
     ("Ngọc", "KTPL"): "Thầy Ngọc (KTPL)",
     ("Ngọc", "CĐ KTPL"): "Thầy Ngọc (KTPL)",
     ("Ngọc", "CN"): "Cô Ngọc (Công Nghệ)",
+
     ("Phương", "V"): "Cô Phương (Văn)",
     ("Phương", "Su"): "Cô Phương (Sử)",
     ("Phương", "CĐ Sử"): "Cô Phương (Sử)",
+    
     ("Anh", "KTPL"): "Cô Lan Anh (GDCD/KTPL)",
     ("Anh", "CĐ KTPL"): "Cô Lan Anh (GDCD/KTPL)",
     ("Anh", "GDCD"): "Cô Lan Anh (GDCD/KTPL)",
+    
     ("Nghĩa", "T"): "Thầy Nghĩa (Toán)",
     ("Nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
     ("nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
+    
     ("Bình", "V"): "Thầy/Cô Bình (Văn)",
     ("Bình", "CĐ Văn"): "Thầy/Cô Bình (Văn)",
+    
     ("Bảo", "Su"): "Thầy Bảo (Sử/GDĐP)",
     ("Bảo", "SĐ"): "Thầy Bảo (Sử/GDĐP)",
+    
     ("Chi", "H"): "Cô Chi (Hóa)",
     ("Chi", "TNHN"): "Cô Chi (Hóa)",
+    
     ("Diệp", "V"): "Cô Diệp (Văn)",
     ("Diệp", "CĐ Văn"): "Cô Diệp (Văn)",
     ("Diệp", "Su"): "Cô Diệp (Sử)",
     ("Diệp", "GDĐP"): "Cô Diệp (Sử)",
+    
     ("Xuân", "GDCD"): "Cô Xuân (GDCD/KTPL)",
     ("Xuân", "KTPL"): "Cô Xuân (GDCD/KTPL)",
     ("Xuân", "CĐ KTPL"): "Cô Xuân (GDCD/KTPL)",
+    
     ("Vinh", "GDCD"): "Cô Vinh (GDCD/KTPL)",
     ("Vinh", "KTPL"): "Cô Vinh (GDCD/KTPL)",
     ("Vinh", "CĐ KTPL"): "Cô Vinh (GDCD/KTPL)",
@@ -155,7 +167,6 @@ st.set_page_config(page_title="Thống kê TKB", page_icon="📊", layout="wide"
 st.title("📊 Công cụ Xử lý & Thống kê TKB")
 
 # --- KHỞI TẠO SESSION STATE ---
-# Giúp giữ lại dữ liệu kể cả khi người dùng thay đổi bộ lọc
 if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
@@ -168,26 +179,22 @@ if uploaded_file is not None:
             df_ket_qua = process_tkb_data(uploaded_file)
             
             if df_ket_qua is not None:
-                # Lưu vào session state
                 st.session_state.df_data = df_ket_qua
                 st.success("Đã phân tích xong! Bạn có thể dùng bộ lọc bên dưới.")
             else:
                 st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel.")
 
-# --- KHU VỰC BỘ LỌC & HIỂN THỊ (Chỉ hiện khi đã có dữ liệu) ---
+# --- KHU VỰC BỘ LỌC & HIỂN THỊ ---
 if st.session_state.df_data is not None:
     df = st.session_state.df_data
     
     st.divider()
     st.subheader("🔍 Bộ lọc dữ liệu")
     
-    # Chia làm 2 cột cho đẹp
     col1, col2 = st.columns(2)
     
     with col1:
-        # Lấy danh sách duy nhất và sắp xếp
         danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
-        # multiselect cho phép chọn nhiều giáo viên cùng lúc. Nếu để trống = hiển thị tất cả.
         gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên (Để trống để xem tất cả):", danh_sach_gv)
         
     with col2:
@@ -207,8 +214,13 @@ if st.session_state.df_data is not None:
     st.markdown(f"**Hiển thị {len(df_filtered)} kết quả:**")
     st.dataframe(df_filtered, use_container_width=True)
     
+    # Tính tổng số tiết theo bộ lọc
+    tong_so_tiet = df_filtered['Số tiết'].sum()
+    st.metric(label="🎯 Tổng số tiết (theo bộ lọc hiện tại)", value=f"{tong_so_tiet} tiết")
+    
+    st.divider()
+    
     # --- XUẤT FILE DỮ LIỆU ĐÃ LỌC ---
-    # Nút này giờ đây sẽ tải xuống df_filtered thay vì df gốc
     csv = df_filtered.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
     st.download_button(
         label="📥 Tải file kết quả (Excel/CSV)",
