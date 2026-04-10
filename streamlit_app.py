@@ -2,6 +2,7 @@ import pandas as pd
 import openpyxl
 import streamlit as st
 import io
+import re
 
 # =====================================================================
 # 1. BỘ TỪ ĐIỂN TỰ ĐỘNG CỦA TRƯỜNG HOA SEN
@@ -72,6 +73,16 @@ def get_standard_name(ten_ky_hieu, mon_hoc):
         return TU_DIEN[(ten_ky_hieu, mon_hoc)]
     return ten_ky_hieu
 
+def phan_loai_khoi(ten_lop):
+    """Hàm tự động phân loại Khối THCS và THPT"""
+    ten_lop = str(ten_lop).strip()
+    if ten_lop.startswith(('10', '11', '12')):
+        return 'THPT'
+    elif ten_lop.startswith(('6', '7', '8', '9')):
+        return 'THCS'
+    else:
+        return 'Khác'
+
 # =====================================================================
 # 2. HÀM XỬ LÝ CHÍNH TRÊN MEMORY
 # =====================================================================
@@ -109,7 +120,8 @@ def process_tkb_data(uploaded_file):
     gvcn_row = df.iloc[gvcn_row_idx]
     
     for col_idx, val in enumerate(class_row):
-        if pd.notna(val) and isinstance(val, str) and ('DA' in val): 
+        # Regex CHỈ bắt tên lớp bắt đầu bằng số từ 6 đến 12 (6, 7, 8, 9, 10, 11, 12)
+        if pd.notna(val) and isinstance(val, str) and re.match(r'^(1[0-2]|[6-9])', val.strip()): 
             class_name = val.strip()
             classes[col_idx] = class_name
             gv_val = str(gvcn_row.iloc[col_idx]).strip()
@@ -125,10 +137,13 @@ def process_tkb_data(uploaded_file):
             cell_val = str(row.iloc[col_idx]).strip()
             if cell_val == 'nan' or cell_val == '' or cell_val in ['CHÀO CỜ', 'SINH HOẠT ĐẦU GIỜ', 'THỂ DỤC THỂ THAO']:
                 continue
+            
+            khoi = phan_loai_khoi(class_name)
 
             if cell_val.lower() == 'chủ nhiệm':
                 ten_goc = gvcn.get(class_name, 'Unknown')
                 records.append({
+                    'Khối': khoi,
                     'Giáo viên': get_standard_name(ten_goc, 'Chủ nhiệm'),
                     'Lớp': class_name, 
                     'Môn': 'Chủ nhiệm'
@@ -139,12 +154,14 @@ def process_tkb_data(uploaded_file):
                     mon_hoc = "-".join(parts[:-1]).strip() 
                     ten_goc = parts[-1].strip()        
                     records.append({
+                        'Khối': khoi,
                         'Giáo viên': get_standard_name(ten_goc, mon_hoc),
                         'Lớp': class_name, 
                         'Môn': mon_hoc
                     })
             else:
                 records.append({
+                    'Khối': khoi,
                     'Giáo viên': 'Chung (Không ghi tên)',
                     'Lớp': class_name, 
                     'Môn': cell_val
@@ -154,8 +171,8 @@ def process_tkb_data(uploaded_file):
     if df_records.empty:
         return None
         
-    df_summary = df_records.groupby(['Giáo viên', 'Lớp', 'Môn']).size().reset_index(name='Số tiết')
-    df_summary = df_summary.sort_values(by=['Giáo viên', 'Lớp', 'Môn'])
+    df_summary = df_records.groupby(['Khối', 'Giáo viên', 'Lớp', 'Môn']).size().reset_index(name='Số tiết')
+    df_summary = df_summary.sort_values(by=['Khối', 'Giáo viên', 'Lớp', 'Môn'])
     
     return df_summary
 
@@ -191,19 +208,26 @@ if st.session_state.df_data is not None:
     st.divider()
     st.subheader("🔍 Bộ lọc dữ liệu")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
-        gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên (Để trống để xem tất cả):", danh_sach_gv)
-        
+        danh_sach_khoi = sorted(df['Khối'].unique().tolist())
+        khoi_chon = st.multiselect("📚 Chọn Khối (Để trống để xem tất cả):", danh_sach_khoi)
+
     with col2:
+        danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
+        gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên:", danh_sach_gv)
+        
+    with col3:
         danh_sach_lop = sorted(df['Lớp'].unique().tolist())
-        lop_chon = st.multiselect("🏫 Chọn Lớp (Để trống để xem tất cả):", danh_sach_lop)
+        lop_chon = st.multiselect("🏫 Chọn Lớp:", danh_sach_lop)
 
     # --- ÁP DỤNG BỘ LỌC ---
     df_filtered = df.copy()
     
+    if len(khoi_chon) > 0:
+        df_filtered = df_filtered[df_filtered['Khối'].isin(khoi_chon)]
+
     if len(gv_chon) > 0:
         df_filtered = df_filtered[df_filtered['Giáo viên'].isin(gv_chon)]
         
