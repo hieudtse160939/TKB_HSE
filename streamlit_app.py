@@ -120,7 +120,6 @@ def process_tkb_data(uploaded_file):
     gvcn_row = df.iloc[gvcn_row_idx]
     
     for col_idx, val in enumerate(class_row):
-        # Regex CHỈ bắt tên lớp bắt đầu bằng số từ 6 đến 12 (6, 7, 8, 9, 10, 11, 12)
         if pd.notna(val) and isinstance(val, str) and re.match(r'^(1[0-2]|[6-9])', val.strip()): 
             class_name = val.strip()
             classes[col_idx] = class_name
@@ -183,11 +182,9 @@ st.set_page_config(page_title="Thống kê TKB", page_icon="📊", layout="wide"
 
 st.title("📊 Công cụ Xử lý & Thống kê TKB")
 
-# --- KHỞI TẠO SESSION STATE ---
 if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
-# --- KHU VỰC UPLOAD ---
 uploaded_file = st.file_uploader("Kéo thả hoặc chọn file TKB (.xlsx) vào đây", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -201,54 +198,69 @@ if uploaded_file is not None:
             else:
                 st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel.")
 
-# --- KHU VỰC BỘ LỌC & HIỂN THỊ ---
 if st.session_state.df_data is not None:
     df = st.session_state.df_data
     
     st.divider()
     st.subheader("🔍 Bộ lọc dữ liệu")
     
-    col1, col2, col3 = st.columns(3)
+    col_f1, col_f2, col_f3 = st.columns(3)
     
-    with col1:
+    with col_f1:
         danh_sach_khoi = sorted(df['Khối'].unique().tolist())
-        khoi_chon = st.multiselect("📚 Chọn Khối (Để trống để xem tất cả):", danh_sach_khoi)
+        khoi_chon = st.multiselect("📚 Chọn Khối:", danh_sach_khoi)
 
-    with col2:
+    with col_f2:
         danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
         gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên:", danh_sach_gv)
         
-    with col3:
+    with col_f3:
         danh_sach_lop = sorted(df['Lớp'].unique().tolist())
         lop_chon = st.multiselect("🏫 Chọn Lớp:", danh_sach_lop)
 
     # --- ÁP DỤNG BỘ LỌC ---
     df_filtered = df.copy()
-    
     if len(khoi_chon) > 0:
         df_filtered = df_filtered[df_filtered['Khối'].isin(khoi_chon)]
-
     if len(gv_chon) > 0:
         df_filtered = df_filtered[df_filtered['Giáo viên'].isin(gv_chon)]
-        
     if len(lop_chon) > 0:
         df_filtered = df_filtered[df_filtered['Lớp'].isin(lop_chon)]
 
-    # --- HIỂN THỊ KẾT QUẢ ĐÃ LỌC ---
-    st.markdown(f"**Hiển thị {len(df_filtered)} kết quả:**")
-    st.dataframe(df_filtered, use_container_width=True)
-    
-    # Tính tổng số tiết theo bộ lọc
-    tong_so_tiet = df_filtered['Số tiết'].sum()
-    st.metric(label="🎯 Tổng số tiết (theo bộ lọc hiện tại)", value=f"{tong_so_tiet} tiết")
-    
+    # --- HIỂN THỊ KẾT QUẢ TỔNG HỢP (MỚI THÊM) ---
     st.divider()
     
-    # --- XUẤT FILE DỮ LIỆU ĐÃ LỌC ---
+    # Chia layout hiển thị bảng tổng hợp và bảng chi tiết
+    col_summary, col_detail = st.columns([1, 2])
+
+    with col_summary:
+        st.subheader("📈 Tổng số tiết theo GV")
+        # Tính toán bảng tổng hợp
+        df_teacher_sum = df_filtered.groupby('Giáo viên')['Số tiết'].sum().reset_index()
+        df_teacher_sum = df_teacher_sum.sort_values(by='Số tiết', ascending=False)
+        
+        # Hiển thị bảng tổng hợp
+        st.dataframe(
+            df_teacher_sum, 
+            hide_index=True, 
+            use_container_width=True
+        )
+        
+        # Tổng cộng cuối cùng
+        tong_tat_ca = df_teacher_sum['Số tiết'].sum()
+        st.metric(label="🎯 Tổng số tiết (tất cả)", value=f"{tong_tat_ca} tiết")
+
+    with col_detail:
+        st.subheader("📋 Chi tiết phân bổ")
+        st.dataframe(df_filtered, hide_index=True, use_container_width=True)
+
+    st.divider()
+    
+    # --- XUẤT FILE ---
     csv = df_filtered.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
     st.download_button(
-        label="📥 Tải file kết quả (Excel/CSV)",
+        label="📥 Tải file kết quả (CSV/Excel)",
         data=csv,
-        file_name="ThongKe_TKB_DaLoc.csv",
+        file_name="ThongKe_TKB.csv",
         mime="text/csv",
     )
