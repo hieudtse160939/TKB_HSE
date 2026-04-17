@@ -1,213 +1,440 @@
 import pandas as pd
+
 import openpyxl
+
 import streamlit as st
+
 import io
+
 import re
 
+
+
 # =====================================================================
-# 1. CẤU HÌNH & TỪ ĐIỂN ƯU TIÊN (Dành cho các trường hợp đặc biệt)
+
+# 1. BỘ TỪ ĐIỂN TỰ ĐỘNG CỦA TRƯỜNG HOA SEN
+
 # =====================================================================
-TU_DIEN_UU_TIEN = {
-    ("Vân", "L"): "Cô Vân (Lý)",
-    ("Vân", "CĐ Lý"): "Cô Vân (Lý)",
-    ("Vân", "Đ"): "Cô Vân (Địa)",
-    ("Vân", "A"): "Cô Thảo Vân (Anh)",
-    ("Nhung", "V"): "Cô T.Nhung (Văn)",
-    ("Nhung", "CĐ Văn"): "Cô T.Nhung (Văn)",
+
+# =====================================================================
+# BỘ TỪ ĐIỂN TỰ ĐỘNG ĐÃ ĐƯỢC MAPPING TỪ FILE TUẦN 1 & DSGVBM
+# =====================================================================
+TU_DIEN = {
+    # --- TỔ VĂN ---
+    ("Việt", "V"): "Thầy Lê Công Quốc Việt (Văn)",
+    ("Việt", "CĐ Văn"): "Thầy Lê Công Quốc Việt (Văn)",
+    ("Nhung", "V"): "Cô Trần Thị Tuyết Nhung (Văn)",
+    ("Nhung", "CĐ Văn"): "Cô Trần Thị Tuyết Nhung (Văn)",
+    ("Tâm", "V"): "Thầy Ngô Đình Tâm (Văn)",
+    ("Tâm", "CĐ Văn"): "Thầy Ngô Đình Tâm (Văn)",
+    ("Bình", "V"): "Cô Lê Thị Bình (Văn)",
+    ("Bình", "CĐ Văn"): "Cô Lê Thị Bình (Văn)",
+    ("Hạnh", "V"): "Cô Lê Ngọc Bích Hạnh (Văn)",
+    ("Hạnh", "CĐ Văn"): "Cô Lê Ngọc Bích Hạnh (Văn)",
+    ("Nhàn", "V"): "Cô Lưu Thị Nhàn (Văn)",
+    ("Nhàn", "CĐ Văn"): "Cô Lưu Thị Nhàn (Văn)",
+    ("Thoa", "V"): "Cô Nguyễn Thị Thoa (Văn)",
+    ("Thoa", "CĐ Văn"): "Cô Nguyễn Thị Thoa (Văn)",
+    ("Oanh", "V"): "Cô Võ Thị Oanh (Văn)",
+    ("Oanh", "CĐ Văn"): "Cô Võ Thị Oanh (Văn)",
+    ("Như", "V"): "Cô Võ Nguyễn Huỳnh Như (Văn)",
+    ("Như", "CĐ Văn"): "Cô Võ Nguyễn Huỳnh Như (Văn)",
+    ("Diệp", "V"): "Cô Phan Thị Ngọc Diệp (Văn)",
+    ("Diệp", "CĐ Văn"): "Cô Phan Thị Ngọc Diệp (Văn)",
+    ("Nam", "V"): "Thầy Nguyễn Văn Nam (Văn)",
+
+    # --- TỔ TOÁN ---
     ("Nghĩa", "T"): "Thầy Nghĩa (Toán)",
-    ("nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
+    ("Nghĩa", "CĐ Toán"): "Thầy Nghĩa (Toán)",
+    ("Như", "T"): "Cô Nguyễn Trương Quỳnh Như (Toán)",
+    ("Như", "CĐ Toán"): "Cô Nguyễn Trương Quỳnh Như (Toán)",
+    ("Nhi", "T"): "Cô Lê Thị Yến Nhi (Toán)",
+    ("Nhi", "CĐ Toán"): "Cô Lê Thị Yến Nhi (Toán)",
+    ("Sang", "T"): "Thầy Huỳnh Phước Sang (Toán)",
+    ("Sang", "Toán"): "Thầy Huỳnh Phước Sang (Toán)",
+    ("Sanh", "T"): "Thầy Đặng Văn Sanh (Toán)",
+    ("Sanh", "CĐ Toán"): "Thầy Đặng Văn Sanh (Toán)",
+    ("Vũ", "T"): "Thầy Hồ Thế Vũ (Toán)",
+    ("Vũ", "CĐ Toán"): "Thầy Hồ Thế Vũ (Toán)",
+    ("Thọ", "T"): "Thầy Phan Minh Thọ (Toán)",
+    ("Thọ", "CĐ Toán"): "Thầy Phan Minh Thọ (Toán)",
+    ("Thuận", "T"): "Thầy Lư Quang Thuận (Toán)",
+    ("Thuận", "CĐ Toán"): "Thầy Lư Quang Thuận (Toán)",
+    ("Thương", "T"): "Cô Trần Thị Thanh Thương (Toán)",
+    ("Thương", "CĐ Toán"): "Cô Trần Thị Thanh Thương (Toán)",
+    ("Trinh", "T"): "Cô Nguyễn Thị Bích Trinh (Toán)",
+    ("Ánh", "T"): "Cô Lê Thị Ngọc Ánh (Toán)",
+    ("Ánh", "CĐ Toán"): "Cô Lê Thị Ngọc Ánh (Toán)",
+
+    # --- TỔ ANH VĂN ---
+    ("Vân", "A"): "Cô Nguyễn Thảo Vân (Anh)",
+    ("Vân", "IELTS/A"): "Cô Nguyễn Thảo Vân (Anh)",
+    ("Lài", "A"): "Cô Nguyễn Thị Lài (Anh)",
+    ("Lài", "IELTS/A"): "Cô Nguyễn Thị Lài (Anh)",
+    ("Nhi", "A"): "Cô Trần Trúc Nhi (Anh)",
+    ("Nhung", "A"): "Cô Nguyễn Thị Phương Nhung (Anh)",
+    ("Biền", "A"): "Cô Đinh Thị Biền (Anh)",
+    ("Giang", "A"): "Cô Bùi Thị Giang (Anh)",
+    ("Loan", "A"): "Cô Chu Thị Hồng Loan (Anh)",
+    ("Thúy", "A"): "Cô Ngô Hà Thanh Thúy (Anh)",
+    ("Thư", "A"): "Cô Phan Thị Minh Thư (Anh)",
+    ("Thu", "A"): "Cô Thái Ngọc Thu (Anh)",
+    ("Đào", "A"): "Cô Lê Hồng Đào (Anh)",
+    ("Đông", "A"): "Cô Trần Thị Đông (Anh)",
+
+    # --- TỔ LÝ - HÓA - SINH - CN ---
+    ("Vân", "L"): "Cô Nguyễn Thị Vân (Lý)",
+    ("Vân", "CĐ Lý"): "Cô Nguyễn Thị Vân (Lý)",
+    ("Ngọc", "L"): "Cô Phạm Thị Cẩm Ngọc (Lý)",
+    ("Ngọc", "CĐ Lý"): "Cô Phạm Thị Cẩm Ngọc (Lý)",
+    ("Ngân", "L"): "Cô Hà Thị Kim Ngân (Lý)",
+    ("Ngân", "CĐ Lý"): "Cô Hà Thị Kim Ngân (Lý)",
+    ("Quỳnh", "L"): "Cô Mai Thị Ngọc Quỳnh (Lý)",
+    ("Đức", "L"): "Thầy Nguyễn Vĩnh Đức (Lý)",
+    ("Đức", "CĐ Lý"): "Thầy Nguyễn Vĩnh Đức (Lý)",
+    ("Chi", "H"): "Cô Trần Thị Quí Chi (Hóa)",
+    ("Phượng", "H"): "Cô Vũ Thị Phượng (Hóa)",
+    ("Quỳnh", "H"): "Cô Nguyễn Thị Như Quỳnh (Hóa)",
+    ("Ân", "H"): "Thầy Nguyễn Hoàng Thiên Ân (Hóa)",
+    ("Thi", "Si"): "Thầy Trương Đình Thi (Sinh)",
+    ("Trinh", "Si"): "Cô Huỳnh Thị Tuyết Trinh (Sinh)",
+    ("Hải", "Si"): "Cô Bùi Thị Minh Hải (Sinh)",
+
+    # --- TỔ SỬ - ĐỊA - KTPL ---
+    ("Bảo", "Su"): "Thầy Vương Quốc Bảo (Sử)",
+    ("Phương", "Su"): "Cô Tống Thị Phương (Sử)",
+    ("Trung", "Su"): "Thầy Lý Văn Trung (Sử)",
+    ("Thủy", "Su"): "Cô Đỗ Thị Thu Thủy (Sử)",
+    ("Hương", "Su"): "Cô Nguyễn Thị Hương (Sử)",
+    ("Linh", "Su"): "Cô Nguyễn Thị Linh (Sử)",
+    ("Vy", "Đ"): "Cô Phan Thị Thảo Vy (Địa)",
+    ("Hương", "Đ"): "Cô Võ Thị Hương (Địa)",
+    ("Hiền", "Đ"): "Cô Đặng Thị Hiền (Địa)",
+    ("Minh", "Đ"): "Cô Mai Thị Ngọc Minh (Địa)",
+    ("Xuân", "KTPL"): "Cô Xuân (KTPL)",
+    ("Vinh", "KTPL"): "Cô Vinh (KTPL)",
+    ("Anh", "KTPL"): "Cô Lan Anh (KTPL)",
+    ("Ngọc", "KTPL"): "Thầy Ngọc (KTPL)",
+
+    # --- CÁC TRƯỜNG HỢP ĐẢO NGƯỢC (Tên - Môn) ---
+    # (Dùng để fix lỗi TKB ghi ngược "Tên giáo viên - Tên môn")
+    ("V", "Việt"): "Thầy Lê Công Quốc Việt (Văn)",
+    ("V", "Nhung"): "Cô Trần Thị Tuyết Nhung (Văn)",
+    ("V", "Tâm"): "Thầy Ngô Đình Tâm (Văn)",
+    ("T", "Nghĩa"): "Thầy Nghĩa (Toán)",
+    ("L", "Vân"): "Cô Nguyễn Thị Vân (Lý)",
+    ("L", "Ngọc"): "Cô Phạm Thị Cẩm Ngọc (Lý)",
+    ("A", "Vân"): "Cô Nguyễn Thảo Vân (Anh)",
 }
 
-# =====================================================================
-# 2. HÀM HỖ TRỢ TRA CỨU TÊN GIÁO VIÊN
-# =====================================================================
-def get_standard_name(ten_tat, mon_hoc, teacher_dict):
-    """
-    Quy trình tra cứu:
-    1. Kiểm tra từ điển ưu tiên.
-    2. Tra cứu trong file DSGVBM dựa trên Tên và Môn.
-    3. Nếu không thấy, trả về định dạng mặc định.
-    """
-    # 1. Ưu tiên từ điển viết tay
-    if (ten_tat, mon_hoc) in TU_DIEN_UU_TIEN:
-        return TU_DIEN_UU_TIEN[(ten_tat, mon_hoc)]
-    
-    # 2. Chuẩn hóa tên môn để khớp với file DSGVBM
-    # Ví dụ: "CĐ Văn" -> "Văn", "T" -> "Toán"
-    mon_sach = mon_hoc.replace("CĐ ", "").strip()
-    if mon_sach == "V": mon_sach = "Văn"
-    if mon_sach == "T": mon_sach = "Toán"
-    if mon_sach == "L": mon_sach = "Lý"
-    if mon_sach == "H": mon_sach = "Hóa"
-    if mon_sach == "A": mon_sach = "Anh"
 
-    # 3. Tra cứu trong dictionary được tạo từ file DSGVBM
-    # Khớp theo Tên (chữ cuối) và Môn (có chứa từ khóa môn học)
-    key = (ten_tat.lower(), mon_sach.lower())
-    if key in teacher_dict:
-        return teacher_dict[key]
-    
-    # 4. Mặc định nếu không tìm thấy
-    return f"{ten_tat} ({mon_hoc})"
+
+def get_standard_name(ten_ky_hieu, mon_hoc):
+
+    if mon_hoc == 'Chủ nhiệm':
+
+        return f"{ten_ky_hieu} (GVCN)"
+
+    if (ten_ky_hieu, mon_hoc) in TU_DIEN:
+
+        return TU_DIEN[(ten_ky_hieu, mon_hoc)]
+
+    return ten_ky_hieu
+
+
 
 def phan_loai_khoi(ten_lop):
+
+    """Hàm tự động phân loại Khối THCS và THPT"""
+
     ten_lop = str(ten_lop).strip()
-    if ten_lop.startswith(('10', '11', '12')): return 'THPT'
-    if ten_lop.startswith(('6', '7', '8', '9')): return 'THCS'
-    return 'Khác'
+
+    if ten_lop.startswith(('10', '11', '12')):
+
+        return 'THPT'
+
+    elif ten_lop.startswith(('6', '7', '8', '9')):
+
+        return 'THCS'
+
+    else:
+
+        return 'Khác'
+
+
 
 # =====================================================================
-# 3. XỬ LÝ FILE TKB
+
+# 2. HÀM XỬ LÝ CHÍNH TRÊN MEMORY
+
 # =====================================================================
-def process_tkb_data(uploaded_tkb, teacher_dict):
-    wb = openpyxl.load_workbook(uploaded_tkb)
+
+def process_tkb_data(uploaded_file):
+
+    wb = openpyxl.load_workbook(uploaded_file)
+
     
-    # Unmerge tất cả các cell
+
     for sheet_name in wb.sheetnames:
+
         ws = wb[sheet_name]
+
         merged_ranges = list(ws.merged_cells.ranges)
+
+        
+
         for merged_range in merged_ranges:
+
             min_col, min_row, max_col, max_row = merged_range.bounds
+
             top_left_cell_value = ws.cell(row=min_row, column=min_col).value
+
             ws.unmerge_cells(str(merged_range))
+
             for row in range(min_row, max_row + 1):
+
                 for col in range(min_col, max_col + 1):
+
                     ws.cell(row=row, column=col).value = top_left_cell_value
+
                     
-        # Giới hạn dòng xử lý (thường TKB không quá 66 dòng)
-        if ws.max_row > 66:
-            ws.delete_rows(67, ws.max_row - 66)
+
+        max_row_current = ws.max_row
+
+        if max_row_current > 66:
+
+            ws.delete_rows(67, max_row_current - 66)
+
             
+
     virtual_workbook = io.BytesIO()
+
     wb.save(virtual_workbook)
+
     virtual_workbook.seek(0)
+
+    
+
     df = pd.read_excel(virtual_workbook) 
+
     
-    # Xác định vị trí lớp và GVCN (Dòng 4 và 5 trong Excel tương ứng idx 3, 4)
-    class_row_idx, gvcn_row_idx = 3, 4
-    classes, gvcn = {}, {}
+
+    class_row_idx = 3
+
+    gvcn_row_idx = 4
+
+    classes = {} 
+
+    gvcn = {}    
+
     
+
     class_row = df.iloc[class_row_idx]
+
     gvcn_row = df.iloc[gvcn_row_idx]
+
     
+
     for col_idx, val in enumerate(class_row):
+
+        # Regex CHỈ bắt tên lớp bắt đầu bằng số từ 6 đến 12 (6, 7, 8, 9, 10, 11, 12)
+
         if pd.notna(val) and isinstance(val, str) and re.match(r'^(1[0-2]|[6-9])', val.strip()): 
+
             class_name = val.strip()
+
             classes[col_idx] = class_name
+
             gv_val = str(gvcn_row.iloc[col_idx]).strip()
-            gvcn[class_name] = gv_val.split('-')[0].strip() if '-' in gv_val else gv_val
+
+            if '-' in gv_val:
+
+                gvcn[class_name] = gv_val.split('-')[0].strip()
+
+            else:
+
+                gvcn[class_name] = gv_val
+
+
 
     records = []
-    # Bắt đầu duyệt từ dòng tiết học (idx 5)
+
     for row_idx in range(5, len(df)):
+
         row = df.iloc[row_idx]
+
         for col_idx, class_name in classes.items():
+
             cell_val = str(row.iloc[col_idx]).strip()
-            if cell_val in ['nan', '', 'CHÀO CỜ', 'SINH HOẠT ĐẦU GIỜ', 'THỂ DỤC THỂ THAO']:
+
+            if cell_val == 'nan' or cell_val == '' or cell_val in ['CHÀO CỜ', 'SINH HOẠT ĐẦU GIỜ', 'THỂ DỤC THỂ THAO']:
+
                 continue
+
             
+
             khoi = phan_loai_khoi(class_name)
 
-            # Trường hợp tiết Chủ nhiệm
+
+
             if cell_val.lower() == 'chủ nhiệm':
+
                 ten_goc = gvcn.get(class_name, 'Unknown')
+
                 records.append({
+
                     'Khối': khoi,
-                    'Giáo viên': f"{ten_goc} (GVCN)",
-                    'Lớp': class_name, 'Môn': 'Chủ nhiệm'
+
+                    'Giáo viên': get_standard_name(ten_goc, 'Chủ nhiệm'),
+
+                    'Lớp': class_name, 
+
+                    'Môn': 'Chủ nhiệm'
+
                 })
-            # Trường hợp tiết có gạch nối (Môn - TênGV) hoặc (CĐ Môn - TênGV)
+
             elif '-' in cell_val:
+
                 parts = cell_val.split('-')
-                mon_hoc = "-".join(parts[:-1]).strip() 
-                ten_tat = parts[-1].strip()        
-                records.append({
-                    'Khối': khoi,
-                    'Giáo viên': get_standard_name(ten_tat, mon_hoc, teacher_dict),
-                    'Lớp': class_name, 'Môn': mon_hoc
-                })
+
+                if len(parts) >= 2:
+
+                    mon_hoc = "-".join(parts[:-1]).strip() 
+
+                    ten_goc = parts[-1].strip()        
+
+                    records.append({
+
+                        'Khối': khoi,
+
+                        'Giáo viên': get_standard_name(ten_goc, mon_hoc),
+
+                        'Lớp': class_name, 
+
+                        'Môn': mon_hoc
+
+                    })
+
             else:
+
                 records.append({
-                    'Khối': khoi, 'Giáo viên': 'Chung (Không tên)',
-                    'Lớp': class_name, 'Môn': cell_val
+
+                    'Khối': khoi,
+
+                    'Giáo viên': 'Chung (Không ghi tên)',
+
+                    'Lớp': class_name, 
+
+                    'Môn': cell_val
+
                 })
 
-    return pd.DataFrame(records)
 
-# =====================================================================
-# 4. GIAO DIỆN STREAMLIT
-# =====================================================================
-st.set_page_config(page_title="Hoa Sen TKB Tool", layout="wide")
-st.title("📊 Công cụ Thống kê Tiết dạy Hoa Sen")
 
-# --- BƯỚC 1: TẢI DANH SÁCH GIÁO VIÊN ---
-st.sidebar.header("1. Cài đặt Danh bạ")
-file_dsgv = st.sidebar.file_uploader("Tải file DSGVBM (.xlsx hoặc .csv)", type=["xlsx", "csv"])
+    df_records = pd.DataFrame(records)
 
-teacher_dict = {}
-if file_dsgv:
-    try:
-        if file_dsgv.name.endswith('csv'):
-            df_ds = pd.read_csv(file_dsgv)
-        else:
-            df_ds = pd.read_excel(file_dsgv)
+    if df_records.empty:
+
+        return None
+
         
-        # Tạo từ điển tra cứu nhanh
-        for _, r in df_ds.iterrows():
-            ho_ten = str(r['Họ tên GV']).strip()
-            mon = str(r['GVBM']).strip()
-            ten_rieng = ho_ten.split()[-1].lower()
-            # Key: (tên, môn_viết_tắt) -> Value: Họ tên đầy đủ (Môn)
-            teacher_dict[(ten_rieng, mon.lower())] = f"{ho_ten} ({mon})"
-        st.sidebar.success(f"Đã nạp {len(teacher_dict)} giáo viên!")
-    except Exception as e:
-        st.sidebar.error(f"Lỗi file danh sách: {e}")
 
-# --- BƯỚC 2: TẢI TKB VÀ XỬ LÝ ---
-st.subheader("2. Phân tích Thời khóa biểu")
-file_tkb = st.file_uploader("Tải file TKB (.xlsx)", type=["xlsx"])
+    df_summary = df_records.groupby(['Khối', 'Giáo viên', 'Lớp', 'Môn']).size().reset_index(name='Số tiết')
 
-if file_tkb and teacher_dict:
-    if st.button("Bắt đầu phân tích", type="primary"):
-        df_raw = process_tkb_data(file_tkb, teacher_dict)
-        
-        if not df_raw.empty:
-            # Lưu vào session state
-            st.session_state.data = df_raw.groupby(['Khối', 'Giáo viên', 'Lớp', 'Môn']).size().reset_index(name='Số tiết')
-            st.success("Phân tích hoàn tất!")
+    df_summary = df_summary.sort_values(by=['Khối', 'Giáo viên', 'Lớp', 'Môn'])
 
-# --- BƯỚC 3: HIỂN THỊ KẾT QUẢ ---
-if 'data' in st.session_state:
-    df = st.session_state.data
     
-    # Bộ lọc
+
+    return df_summary
+
+
+
+# =====================================================================
+
+# 3. GIAO DIỆN STREAMLIT VỚI FILTER VÀ EXPORT
+
+# =====================================================================
+
+st.set_page_config(page_title="Thống kê TKB", page_icon="📊", layout="wide")
+
+
+
+st.title("📊 Công cụ Xử lý & Thống kê TKB")
+
+
+
+# --- KHỞI TẠO SESSION STATE ---
+
+if 'df_data' not in st.session_state:
+
+    st.session_state.df_data = None
+
+
+
+# --- KHU VỰC UPLOAD ---
+
+uploaded_file = st.file_uploader("Kéo thả hoặc chọn file TKB (.xlsx) vào đây", type=["xlsx"])
+
+
+
+if uploaded_file is not None:
+
+    if st.button("Bắt đầu phân tích dữ liệu", type="primary"):
+
+        with st.spinner('Đang xử lý dữ liệu...'):
+
+            df_ket_qua = process_tkb_data(uploaded_file)
+
+            
+
+            if df_ket_qua is not None:
+
+                st.session_state.df_data = df_ket_qua
+
+                st.success("Đã phân tích xong! Bạn có thể dùng bộ lọc bên dưới.")
+
+            else:
+
+                st.error("Không tìm thấy dữ liệu hợp lệ trong file Excel.")
+
+
+
+# --- KHU VỰC BỘ LỌC & HIỂN THỊ ---
+
+if st.session_state.df_data is not None:
+
+    df = st.session_state.df_data
+
+    
+
     st.divider()
-    c1, c2 = st.columns(2)
-    with c1:
-        gv_filter = st.multiselect("Chọn Giáo viên:", sorted(df['Giáo viên'].unique()))
-    with c2:
-        khoi_filter = st.multiselect("Chọn Khối:", sorted(df['Khối'].unique()))
+
+    st.subheader("🔍 Bộ lọc dữ liệu")
+
     
-    df_f = df.copy()
-    if gv_filter: df_f = df_f[df_f['Giáo viên'].isin(gv_filter)]
-    if khoi_filter: df_f = df_f[df_f['Khối'].isin(khoi_filter)]
 
-    # Hiển thị bảng tổng hợp và chi tiết
-    col_left, col_right = st.columns([1, 2])
+    col1, col2, col3 = st.columns(3)
+
     
-    with col_left:
-        st.subheader("📈 Tổng số tiết/GV")
-        summary = df_f.groupby('Giáo viên')['Số tiết'].sum().reset_index().sort_values('Số tiết', ascending=False)
-        st.dataframe(summary, hide_index=True, use_container_width=True)
-        st.metric("Tổng cộng", f"{summary['Số tiết'].sum()} tiết")
 
-    with col_right:
-        st.subheader("📋 Chi tiết phân bổ")
-        st.dataframe(df_f, hide_index=True, use_container_width=True)
+    with col1:
 
-    # Xuất file
-    csv = df_f.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-    st.download_button("📥 Tải kết quả (CSV)", data=csv, file_name="ThongKe_TKB.csv", mime="text/csv")
-else:
-    if not teacher_dict:
-        st.info("Vui lòng tải file Danh sách GV (DSGVBM) ở thanh bên trái trước.")
+        danh_sach_khoi = sorted(df['Khối'].unique().tolist())
+
+        khoi_chon = st.multiselect("📚 Chọn Khối (Để trống để xem tất cả):", danh_sach_khoi)
+
+
+
+    with col2:
+
+        danh_sach_gv = sorted(df['Giáo viên'].unique().tolist())
+
+        gv_chon = st.multiselect("👩‍🏫 Chọn Giáo viên:", danh_sach_gv)
+
+        
+
+    with col3:
+
+        danh_sach_lop = sorted(df['Lớp'].unique().tolist())
+
+        lop_chon = st.multiselect("🏫 Chọn Lớp:", danh_sach_lop)
